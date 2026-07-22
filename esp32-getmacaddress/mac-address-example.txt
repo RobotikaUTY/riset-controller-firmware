@@ -1,0 +1,13 @@
+Mac Address ESP32 32D
+Wi-Fi Station (using 'esp_efuse_mac_get_default')       8C:4F:00:2E:99:08
+WiFi Station (using 'esp_read_mac')                     8C:4F:00:2E:99:08
+WiFi Soft-AP (using 'esp_read_mac')                     8C:4F:00:2E:99:09
+Bluetooth (using 'esp_read_mac')                        8C:4F:00:2E:99:0A
+Ethernet (using 'esp_read_mac')                         8C:4F:00:2E:99:0B
+
+Mac Address ESP32 DEVKIT V1
+Wi-Fi Station (using 'esp_efuse_mac_get_default')       CC:DB:A7:9F:67:B4
+WiFi Station (using 'esp_read_mac')                     CC:DB:A7:9F:67:B4
+WiFi Soft-AP (using 'esp_read_mac')                     CC:DB:A7:9F:67:B5
+Bluetooth (using 'esp_read_mac')                        CC:DB:A7:9F:67:B6
+Ethernet (using 'esp_read_mac')                         CC:DB:A7:9F:67:B7
