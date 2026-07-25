@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Fonts/TomThumb.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -55,7 +56,10 @@ enum ControlMode : uint8_t {
 enum UiScreen : uint8_t {
   SCREEN_HOME = 0,
   SCREEN_MENU,
-  SCREEN_SCAN
+  SCREEN_SCAN,
+  SCREEN_ABOUT,
+  SCREEN_TURBO_SELECT,
+  SCREEN_COMING_SOON
 };
 
 enum PacketType : uint8_t {
@@ -89,7 +93,34 @@ unsigned long lastSuccess = 0;
 UiScreen uiScreen = SCREEN_HOME;
 uint8_t previousButtons = 0;
 uint8_t menuIndex = 0;
-char activeReceiverName[16] = "SEARCH";
+char activeReceiverName[16] = "No Device";
+float remoteBatteryVoltage = 4.2f;
+float robotBatteryVoltage = 12.0f;
+
+// Asumsi chemistry baterai untuk hitung persentase ikon - sesuaikan kalau beda
+const float remoteBatteryMinV = 3.3f; // Li-ion 1 sel
+const float remoteBatteryMaxV = 4.2f;
+const float robotBatteryMinV = 9.0f;  // LiPo 3S
+const float robotBatteryMaxV = 12.6f;
+
+// Set Button (swap Y<->A): fiturnya untuk sementara "Coming Soon" dan tidak dipanggil dari menu.
+// Fungsi & variabelnya tetap disimpan supaya gampang diaktifkan lagi nanti.
+bool buttonsSwapped = false;
+
+// ===================== KECEPATAN =====================
+// Default Speed: kecepatan normal saat jalan biasa (tanpa kombinasi A). Fixed di 180 (tidak bisa di-set user).
+const uint8_t defaultSpeed = 180;
+
+// Turbo Speed: aktif kalau salah satu arah (UP/DOWN/LEFT/RIGHT) ditekan BERSAMAAN dengan A.
+// Nilainya di-custom terpisah, rentang 181-255 (di atas batas atas Default Speed).
+uint8_t turboSpeedValue = 255;
+const uint8_t turboSpeedMin = 181;
+const uint8_t turboSpeedMax = 255;
+
+const uint8_t speedStep = 5;
+
+// Label yang ditampilkan di layar "Coming Soon" (diisi saat masuk dari menu)
+const char* comingSoonLabel = "";
 
 const uint8_t maxReceivers = 8;
 ReceiverEntry discoveredReceivers[maxReceivers];
@@ -103,12 +134,19 @@ const unsigned long scanDurationMs = 6000;
 
 char scannerStatus[32] = "Ready";
 
-const char* menuItems[] = {
-  "Scanning",
+// Menu utama SETTING - tiap item membuka submenu sendiri saat ditekan A
+// (Mode SUMO/SOCCER dihapus - remote sekarang Universal)
+const char* menuItemsBase[] = {
+  "Pair Device",
+  "Set Button",
+  "Set Movement",
+  "Turbo Speed",
+  "About",
   "Exit"
 };
 
-const uint8_t menuItemCount = sizeof(menuItems) / sizeof(menuItems[0]);
+const uint8_t menuItemCount = sizeof(menuItemsBase) / sizeof(menuItemsBase[0]);
+const uint8_t visibleMenuItems = 3;
 
 // ===================== CALLBACK =====================
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -227,6 +265,32 @@ void connectToReceiverIndex(uint8_t index) {
   }
 }
 
+void drawKeypadIndicator(int16_t centerX, int16_t centerY, bool up, bool down, bool left, bool right) {
+  const int16_t radius = 3;
+  const int16_t offset = 8;
+
+  struct KeyDot {
+    int16_t x;
+    int16_t y;
+    bool active;
+  };
+
+  KeyDot dots[] = {
+    {static_cast<int16_t>(centerX), static_cast<int16_t>(centerY - offset), up},
+    {static_cast<int16_t>(centerX - offset), static_cast<int16_t>(centerY), left},
+    {static_cast<int16_t>(centerX + offset), static_cast<int16_t>(centerY), right},
+    {static_cast<int16_t>(centerX), static_cast<int16_t>(centerY + offset), down}
+  };
+
+  for (KeyDot &dot : dots) {
+    if (dot.active) {
+      display.fillCircle(dot.x, dot.y, radius, SSD1306_WHITE);
+    } else {
+      display.drawCircle(dot.x, dot.y, radius, SSD1306_WHITE);
+    }
+  }
+}
+
 struct DebouncedButton {
   uint8_t pin;
   uint8_t mask;
@@ -237,6 +301,8 @@ struct DebouncedButton {
 
 const unsigned long debounceIntervalMs = 15;
 
+// Index tetap: 0=UP 1=DOWN 2=LEFT 3=RIGHT 4=Y 5=X 6=A 7=B
+// toggleButtonSwap() menukar field .mask milik index 4 (Y) dan 6 (A) - belum dipakai (Coming Soon)
 DebouncedButton debouncedButtons[] = {
   {BTN_UP, BTN_MASK_UP, false, false, 0},
   {BTN_DOWN, BTN_MASK_DOWN, false, false, 0},
@@ -247,6 +313,14 @@ DebouncedButton debouncedButtons[] = {
   {BTN_A, BTN_MASK_A, false, false, 0},
   {BTN_B, BTN_MASK_B, false, false, 0}
 };
+
+void toggleButtonSwap() {
+  buttonsSwapped = !buttonsSwapped;
+
+  uint8_t temp = debouncedButtons[4].mask; // slot fisik BTN_Y
+  debouncedButtons[4].mask = debouncedButtons[6].mask; // ambil mask dari slot BTN_A
+  debouncedButtons[6].mask = temp;
+}
 
 void initializeDebouncedButtons() {
   unsigned long now = millis();
@@ -285,6 +359,10 @@ uint8_t readDebouncedButtons() {
 
 bool isButtonJustPressed(uint8_t buttons, uint8_t previous, uint8_t mask) {
   return ((buttons & mask) != 0) && ((previous & mask) == 0);
+}
+
+bool isButtonPressed(uint8_t buttons, uint8_t mask) {
+  return (buttons & mask) != 0;
 }
 
 uint8_t resolveMovementMode(uint8_t buttons) {
@@ -348,32 +426,106 @@ void drawMarqueeText(int16_t x, int16_t y, int16_t widthPixels, const char *text
   }
 }
 
-void drawHomeScreen(uint8_t mode) {
+// Header minimalis dipakai di semua layar setting/submenu: judul + garis tipis, tanpa bingkai kotak.
+void drawSettingsHeader(const char* title) {
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(6, 3);
+  display.print(title);
+  display.drawFastHLine(0, 13, 128, SSD1306_WHITE);
+}
+
+// Footer kecil untuk hint tombol, dipakai di submenu
+void drawHint(const char* hint) {
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(6, 56);
+  display.print(hint);
+}
+
+uint8_t batteryPercent(float voltage, float minV, float maxV) {
+  if (voltage <= minV) return 0;
+  if (voltage >= maxV) return 100;
+  return (uint8_t)(((voltage - minV) / (maxV - minV)) * 100.0f);
+}
+
+// Ikon baterai kecil: body + nub + isi proporsional sesuai persentase
+void drawBatteryIcon(int16_t x, int16_t y, int16_t bodyW, int16_t bodyH, uint8_t percent) {
+  display.drawRect(x, y, bodyW, bodyH, SSD1306_WHITE);
+
+  int16_t nubH = bodyH / 2;
+  display.fillRect(x + bodyW, y + (bodyH - nubH) / 2, 2, nubH, SSD1306_WHITE);
+
+  int16_t fillW = ((bodyW - 2) * percent) / 100;
+  if (fillW > 0) {
+    display.fillRect(x + 1, y + 1, fillW, bodyH - 2, SSD1306_WHITE);
+  }
+}
+
+void drawHomeScreen(uint8_t buttons) {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-  display.drawLine(0, 16, 127, 16, SSD1306_WHITE);
-  display.drawLine(64, 16, 64, 63, SSD1306_WHITE);
 
-  display.setCursor(8, 4);
-  display.print("Katyusha V1.0");
+  // --- Kotak-kotak (grid rapi: kolom kiri title/koneksi, kolom kanan baterai) ---
+  display.drawRoundRect(2, 2, 58, 16, 3, SSD1306_WHITE);   // Judul
+  display.drawRoundRect(64, 2, 62, 16, 3, SSD1306_WHITE);  // Baterai controller (samakan ukuran dgn baterai robot)
+  display.drawRoundRect(36, 21, 56, 20, 3, SSD1306_WHITE); // Status gerak real-time
+  display.drawRoundRect(2, 48, 58, 14, 3, SSD1306_WHITE);  // Status koneksi + nama device
+  display.drawRoundRect(64, 48, 62, 14, 3, SSD1306_WHITE); // Baterai robot
 
-  display.setCursor(8, 24);
-  display.print("MODE");
-  display.setCursor(8, 35);
-  display.println(modeToString(mode));
+  // --- Judul: teks statis, TIDAK marquee (sesuai permintaan) ---
+  display.setCursor(7, 6);
+  display.print("KATYUSHA");
 
-  display.setCursor(72, 24);
-  display.print("LINK");
-  display.setCursor(72, 35);
-  display.println(connected ? "ONLINE" : "SEARCH");
+  // --- Baterai controller: label "C" + ikon + voltase ---
+  display.setCursor(70, 6);
+  display.print("C");
 
-  display.setCursor(72, 44);
-  drawMarqueeText(72, 44, 48, connected ? activeReceiverName : "-");
+  uint8_t ctrlPercent = batteryPercent(remoteBatteryVoltage, remoteBatteryMinV, remoteBatteryMaxV);
+  drawBatteryIcon(80, 6, 10, 6, ctrlPercent);
 
-  display.setCursor(8, 50);
-  display.println("Y: MENU");
+  char remoteBatteryText[8];
+  snprintf(remoteBatteryText, sizeof(remoteBatteryText), "%.1fV", remoteBatteryVoltage);
+  display.setCursor(94, 6);
+  display.print(remoteBatteryText);
+
+  // --- Status gerak real-time (STOP/FORWARD/BACKWARD/LEFT/RIGHT/dst) ---
+  uint8_t liveMode = resolveMovementMode(buttons);
+  const char* modeText = modeToString(liveMode);
+  int modeW = strlen(modeText) * 6;
+  display.setCursor(36 + (56 - modeW) / 2, 27);
+  display.print(modeText);
+
+  drawKeypadIndicator(18, 34,
+                      isButtonPressed(buttons, BTN_MASK_UP),
+                      isButtonPressed(buttons, BTN_MASK_DOWN),
+                      isButtonPressed(buttons, BTN_MASK_LEFT),
+                      isButtonPressed(buttons, BTN_MASK_RIGHT));
+
+  // Layout Xbox: Y atas, A bawah, X kiri, B kanan (urutan tidak diubah)
+  drawKeypadIndicator(110, 34,
+                      isButtonPressed(buttons, BTN_MASK_Y),
+                      isButtonPressed(buttons, BTN_MASK_A),
+                      isButtonPressed(buttons, BTN_MASK_X),
+                      isButtonPressed(buttons, BTN_MASK_B));
+
+  char connectionText[40];
+  if (connected) {
+    snprintf(connectionText, sizeof(connectionText), "%s Connected", activeReceiverName);
+  } else {
+    snprintf(connectionText, sizeof(connectionText), "Searching for device...");
+  }
+  drawMarqueeText(6, 51, 54, connectionText);
+
+  display.setCursor(70, 51);
+  display.print("R");
+
+  uint8_t robotPercent = batteryPercent(robotBatteryVoltage, robotBatteryMinV, robotBatteryMaxV);
+  drawBatteryIcon(80, 51, 10, 6, robotPercent);
+
+  char robotBatteryText[8];
+  snprintf(robotBatteryText, sizeof(robotBatteryText), "%.1fV", robotBatteryVoltage);
+  display.setCursor(94, 51);
+  display.print(robotBatteryText);
 
   display.display();
 }
@@ -381,27 +533,124 @@ void drawHomeScreen(uint8_t mode) {
 void drawMenuScreen() {
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
 
-  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-  display.drawLine(0, 16, 127, 16, SSD1306_WHITE);
+  drawSettingsHeader("SETTINGS");
 
-  display.setCursor(8, 4);
-  display.print("MENU");
+  uint8_t startIndex = 0;
+  if (menuItemCount > visibleMenuItems) {
+    if (menuIndex >= 1) {
+      startIndex = menuIndex - 1;
+    }
+    if (startIndex + visibleMenuItems > menuItemCount) {
+      startIndex = menuItemCount - visibleMenuItems;
+    }
+  }
 
-  for (uint8_t i = 0; i < menuItemCount; i++) {
-    uint8_t y = 26 + (i * 14);
+  const uint8_t listTop = 18;
+  const uint8_t rowHeight = 15;
+  const uint8_t rowWidth = 110; // sisakan ruang kanan untuk chevron + scrollbar
 
-    if (i == menuIndex) {
-      display.fillRect(6, y - 1, 116, 12, SSD1306_WHITE);
+  for (uint8_t row = 0; row < visibleMenuItems; row++) {
+    uint8_t itemIndex = startIndex + row;
+    if (itemIndex >= menuItemCount) {
+      break;
+    }
+
+    uint8_t y = listTop + (row * rowHeight);
+    bool isSelected = (itemIndex == menuIndex);
+
+    if (isSelected) {
+      display.fillRoundRect(4, y - 2, rowWidth, 13, 3, SSD1306_WHITE);
       display.setTextColor(SSD1306_BLACK);
     } else {
       display.setTextColor(SSD1306_WHITE);
     }
 
-    display.setCursor(12, y);
-    display.println(menuItems[i]);
+    char label[24];
+    snprintf(label, sizeof(label), "%d. %s", itemIndex + 1, menuItemsBase[itemIndex]);
+
+    display.setCursor(9, y);
+    display.print(label);
+
+    // Chevron kecil di kanan tiap baris (indikasi "buka submenu")
+    display.setCursor(4 + rowWidth - 6, y);
+    display.print(">");
   }
+
+  display.setTextColor(SSD1306_WHITE);
+
+  // --- Scrollbar minimalis: garis tipis + thumb solid ---
+  const int16_t trackX = 124;
+  const int16_t trackTop = 18;
+  const int16_t trackH = 44;
+
+  display.drawFastVLine(trackX, trackTop, trackH, SSD1306_WHITE);
+
+  int16_t thumbH = (trackH * visibleMenuItems) / menuItemCount;
+  if (thumbH < 6) {
+    thumbH = 6;
+  }
+
+  uint8_t maxScroll = menuItemCount - visibleMenuItems;
+  int16_t thumbY = trackTop;
+  if (maxScroll > 0) {
+    thumbY = trackTop + ((trackH - thumbH) * startIndex) / maxScroll;
+  }
+
+  display.fillRect(trackX - 1, thumbY, 3, thumbH, SSD1306_WHITE);
+
+  display.display();
+}
+
+void drawAboutScreen() {
+  display.clearDisplay();
+  display.setTextSize(1);
+
+  drawSettingsHeader("ABOUT");
+
+  display.setCursor(6, 30);
+  display.print("Info coming soon");
+
+  drawHint("B: Back");
+
+  display.display();
+}
+
+void drawComingSoonScreen() {
+  display.clearDisplay();
+  display.setTextSize(1);
+
+  drawSettingsHeader(comingSoonLabel);
+
+  display.setCursor(6, 30);
+  display.print("Coming Soon");
+
+  drawHint("B: Back");
+
+  display.display();
+}
+
+// Submenu Turbo Speed: UP/DOWN untuk naik-turun nilai, B untuk kembali
+void drawTurboSelectScreen() {
+  display.clearDisplay();
+
+  drawSettingsHeader("TURBO SPEED");
+
+  char valueText[6];
+  snprintf(valueText, sizeof(valueText), "%d", turboSpeedValue);
+
+  display.setTextSize(2);
+  int16_t w = strlen(valueText) * 12;
+  display.setCursor((128 - w) / 2, 22);
+  display.print(valueText);
+
+  display.setTextSize(1);
+  char rangeText[20];
+  snprintf(rangeText, sizeof(rangeText), "Range %d - %d", turboSpeedMin, turboSpeedMax);
+  display.setCursor((128 - (int16_t)strlen(rangeText) * 6) / 2, 42);
+  display.print(rangeText);
+
+  drawHint("Up/Down      B:Back");
 
   display.display();
 }
@@ -409,13 +658,9 @@ void drawMenuScreen() {
 void drawScanScreen() {
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
 
-  display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
-  display.drawLine(0, 16, 127, 16, SSD1306_WHITE);
-
-  const char* scanLabel = "SCANNED";
-  char scanText[16];
+  const char* scanLabel = "PAIR DEVICE";
+  char scanText[20];
 
   if (scanningActive) {
     uint8_t dotCount = (millis() / 300) % 4;
@@ -428,18 +673,16 @@ void drawScanScreen() {
     scanLabel = scanText;
   }
 
-  display.setCursor(8, 4);
-  display.print(scanLabel);
+  drawSettingsHeader(scanLabel);
 
-  display.setCursor(84, 4);
+  display.setCursor(90, 3);
   display.print(discoveredReceiverCount);
-  display.print(" FOUND");
 
   if (discoveredReceiverCount == 0) {
-    display.setCursor(8, 26);
-    display.print("WAITING RECEIVER");
+    display.setCursor(6, 28);
+    display.print("Waiting receiver...");
   } else {
-    uint8_t windowSize = 4;
+    uint8_t windowSize = 3;
     uint8_t startIndex = 0;
 
     if (discoveredReceiverCount > windowSize) {
@@ -458,31 +701,33 @@ void drawScanScreen() {
         break;
       }
 
-      uint8_t y = 25 + (row * 10);
+      uint8_t y = 20 + (row * 13);
+      bool isSelected = (itemIndex == selectedReceiverIndex);
 
-      if (itemIndex == selectedReceiverIndex) {
-        display.fillRect(6, y - 1, 116, 9, SSD1306_WHITE);
+      if (isSelected) {
+        display.fillRoundRect(4, y - 2, 118, 12, 3, SSD1306_WHITE);
         display.setTextColor(SSD1306_BLACK);
       } else {
         display.setTextColor(SSD1306_WHITE);
       }
 
-      display.setCursor(10, y);
-      display.print(itemIndex == selectedReceiverIndex ? ">" : " ");
+      display.setCursor(9, y);
       display.print(discoveredReceivers[itemIndex].name);
-
-      if (itemIndex == selectedReceiverIndex) {
-        display.setTextColor(SSD1306_WHITE);
-      }
     }
   }
+
+  display.setTextColor(SSD1306_WHITE);
+  drawHint("A: Connect   B: Back");
 
   display.display();
 }
 
 void handleUi(uint8_t buttons) {
   if (uiScreen == SCREEN_HOME) {
-    if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_Y)) {
+    bool upAndYPressed = ((buttons & BTN_MASK_UP) != 0) && ((buttons & BTN_MASK_Y) != 0);
+    bool upOrYJustPressed = isButtonJustPressed(buttons, previousButtons, BTN_MASK_Y) || isButtonJustPressed(buttons, previousButtons, BTN_MASK_UP);
+
+    if (upAndYPressed && upOrYJustPressed) {
       uiScreen = SCREEN_MENU;
       menuIndex = 0;
     }
@@ -519,6 +764,28 @@ void handleUi(uint8_t buttons) {
     return;
   }
 
+  if (uiScreen == SCREEN_ABOUT || uiScreen == SCREEN_COMING_SOON) {
+    if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_B)) {
+      uiScreen = SCREEN_MENU;
+    }
+    return;
+  }
+
+  if (uiScreen == SCREEN_TURBO_SELECT) {
+    if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_B)) {
+      uiScreen = SCREEN_MENU;
+      return;
+    }
+    if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_UP)) {
+      turboSpeedValue = (turboSpeedValue + speedStep <= turboSpeedMax) ? turboSpeedValue + speedStep : turboSpeedMax;
+    }
+    if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_DOWN)) {
+      turboSpeedValue = (turboSpeedValue >= turboSpeedMin + speedStep) ? turboSpeedValue - speedStep : turboSpeedMin;
+    }
+    return;
+  }
+
+  // --- Dari sini uiScreen == SCREEN_MENU ---
   if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_B)) {
     uiScreen = SCREEN_HOME;
     return;
@@ -537,14 +804,33 @@ void handleUi(uint8_t buttons) {
   }
 
   if (isButtonJustPressed(buttons, previousButtons, BTN_MASK_A)) {
-    if (menuIndex == 0) {
-      uiScreen = SCREEN_SCAN;
-      beginScan();
-    } else if (menuIndex == menuItemCount - 1) {
-      uiScreen = SCREEN_HOME;
-    } else {
-      Serial.print("Menu item selected: ");
-      Serial.println(menuItems[menuIndex]);
+    switch (menuIndex) {
+      case 0: // Pair Device
+        uiScreen = SCREEN_SCAN;
+        beginScan();
+        break;
+
+      case 1: // Set Button - Coming Soon
+        comingSoonLabel = menuItemsBase[1];
+        uiScreen = SCREEN_COMING_SOON;
+        break;
+
+      case 2: // Set Movement - Coming Soon
+        comingSoonLabel = menuItemsBase[2];
+        uiScreen = SCREEN_COMING_SOON;
+        break;
+
+      case 3: // Turbo Speed
+        uiScreen = SCREEN_TURBO_SELECT;
+        break;
+
+      case 4: // About
+        uiScreen = SCREEN_ABOUT;
+        break;
+
+      case 5: // Exit
+        uiScreen = SCREEN_HOME;
+        break;
     }
   }
 }
@@ -613,13 +899,24 @@ void loop() {
     updateScan();
   }
 
-  if (uiScreen == SCREEN_MENU || uiScreen == SCREEN_SCAN) {
+  bool isDrivingScreen = (uiScreen == SCREEN_HOME);
+
+  if (!isDrivingScreen) {
     packet.buttons = 0;
     packet.speed = 0;
     packet.mode = MODE_STOP;
   } else {
     packet.buttons = buttons & ~BTN_MASK_Y;
-    packet.speed = 220;
+
+    // Turbo aktif kalau salah satu arah (UP/DOWN/LEFT/RIGHT) ditekan BERSAMA A
+    bool anyDirectionPressed = isButtonPressed(packet.buttons, BTN_MASK_UP) ||
+                                isButtonPressed(packet.buttons, BTN_MASK_DOWN) ||
+                                isButtonPressed(packet.buttons, BTN_MASK_LEFT) ||
+                                isButtonPressed(packet.buttons, BTN_MASK_RIGHT);
+
+    bool turboActive = anyDirectionPressed && isButtonPressed(packet.buttons, BTN_MASK_A);
+
+    packet.speed = turboActive ? turboSpeedValue : defaultSpeed;
     packet.mode = resolveMovementMode(packet.buttons);
   }
 
@@ -629,12 +926,25 @@ void loop() {
     connected = false;
   }
 
-  if (uiScreen == SCREEN_MENU) {
-    drawMenuScreen();
-  } else if (uiScreen == SCREEN_SCAN) {
-    drawScanScreen();
-  } else {
-    drawHomeScreen(packet.mode);
+  switch (uiScreen) {
+    case SCREEN_MENU:
+      drawMenuScreen();
+      break;
+    case SCREEN_SCAN:
+      drawScanScreen();
+      break;
+    case SCREEN_ABOUT:
+      drawAboutScreen();
+      break;
+    case SCREEN_TURBO_SELECT:
+      drawTurboSelectScreen();
+      break;
+    case SCREEN_COMING_SOON:
+      drawComingSoonScreen();
+      break;
+    default:
+      drawHomeScreen(buttons);
+      break;
   }
 
   previousButtons = buttons;
