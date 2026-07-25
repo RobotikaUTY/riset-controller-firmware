@@ -18,11 +18,29 @@
 #define PWM_FREQ 1000
 #define PWM_RESOLUTION 8
 
+// ===================== BATTERY SENSE (ROBOT) =====================
+// Pin ADC untuk baca baterai robot lewat voltage divider (belum dipakai fungsi lain)
+#define BATTERY_ADC_PIN 34
+
+// Rasio divider = (R1+R2)/R2. Contoh untuk LiPo 3S (maks ~12.6V):
+// R1=10k (ke B+), R2=3.3k (ke GND) -> (10000+3300)/3300 = 4.03
+// WAJIB dikalibrasi ulang pakai multimeter sesuai resistor asli yang dipasang,
+// dan sesuaikan kalau jenis/jumlah sel baterainya berbeda.
+const float robotDividerRatio = 4.03f;
+const float adcRefVoltage = 3.3f;
+const float adcResolution = 4095.0f;
+
+float robotBatteryVoltage = 12.0f;
+
+unsigned long lastTelemetrySentAt = 0;
+const unsigned long telemetryIntervalMs = 500;
+
 // ===================== PACKET TYPES =====================
 enum PacketType : uint8_t {
   PACKET_TYPE_CONTROL = 1,
   PACKET_TYPE_DISCOVERY_REQUEST = 2,
-  PACKET_TYPE_DISCOVERY_RESPONSE = 3
+  PACKET_TYPE_DISCOVERY_RESPONSE = 3,
+  PACKET_TYPE_TELEMETRY = 4
 };
 
 // ===================== CONTROL PACKET =====================
@@ -61,6 +79,13 @@ typedef struct {
   char name[16];
 } DiscoveryPacket;
 
+// Dikirim BALIK ke controller, isinya tegangan baterai robot saat ini.
+// Struct ini harus identik (urutan & tipe field) dengan yang ada di kode transmitter.
+typedef struct {
+  uint8_t type;
+  float batteryVoltage;
+} TelemetryPacket;
+
 ControlPacket packet;
 
 // ===================== DISCOVERY / SAFETY =====================
@@ -70,6 +95,10 @@ bool discoveryPending = false;
 unsigned long lastControlAt = 0;
 const unsigned long controlTimeoutMs = 300;
 char deviceName[16] = "Katyusha-RX";
+
+// MAC controller yang terakhir kali mengirim ControlPacket - tujuan kirim telemetry
+uint8_t controllerMac[6] = {0};
+bool controllerMacKnown = false;
 
 // ===================== MOTOR CONTROL =====================
 void motorA(int speed) {
@@ -191,12 +220,48 @@ void sendDiscoveryResponse() {
   discoveryPending = false;
 }
 
+// Baca tegangan baterai robot lewat ADC + voltage divider
+float readRobotBatteryVoltage() {
+  int raw = analogRead(BATTERY_ADC_PIN);
+  float vAdc = (raw / adcResolution) * adcRefVoltage;
+  return vAdc * robotDividerRatio;
+}
+
+// Kirim status baterai ke controller terakhir yang diketahui, dibatasi interval biar tidak spam
+void sendTelemetryIfDue() {
+  if (!controllerMacKnown) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (now - lastTelemetrySentAt < telemetryIntervalMs) {
+    return;
+  }
+  lastTelemetrySentAt = now;
+
+  float rawV = readRobotBatteryVoltage();
+  robotBatteryVoltage = (robotBatteryVoltage * 0.9f) + (rawV * 0.1f); // smoothing
+
+  TelemetryPacket telemetry = {};
+  telemetry.type = PACKET_TYPE_TELEMETRY;
+  telemetry.batteryVoltage = robotBatteryVoltage;
+
+  esp_now_send(controllerMac, (uint8_t *)&telemetry, sizeof(telemetry));
+}
+
 // ===================== ESP-NOW CALLBACK =====================
 void onDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   if (len == (int)sizeof(ControlPacket)) {
     memcpy(&packet, incomingData, sizeof(packet));
     lastControlAt = millis();
     applyMode(packet.mode, packet.speed);
+
+    // Catat MAC controller supaya telemetry baterai bisa dikirim balik ke dia
+    if (!controllerMacKnown || memcmp(controllerMac, mac, 6) != 0) {
+      memcpy(controllerMac, mac, 6);
+      controllerMacKnown = true;
+      addPeerIfNeeded(controllerMac);
+    }
     return;
   }
 
@@ -226,6 +291,7 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  pinMode(BATTERY_ADC_PIN, INPUT);
 
   ledcSetup(CHANNEL_A, PWM_FREQ, PWM_RESOLUTION);
   ledcAttachPin(PWMA, CHANNEL_A);
@@ -256,6 +322,8 @@ void loop() {
   if (discoveryPending) {
     sendDiscoveryResponse();
   }
+
+  sendTelemetryIfDue();
 
   if (millis() - lastControlAt > controlTimeoutMs) {
     drive(0, 0);
