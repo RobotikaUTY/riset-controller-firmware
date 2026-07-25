@@ -2,7 +2,7 @@
 
 > **ESP-NOW based robot remote control** — developed by **Technology Development Division**, Robotika UTY.
 
-Katyusha Controller is an ESP32 firmware that turns your ESP32 board into a wireless robot remote control using the **ESP-NOW** protocol (peer-to-peer connection without a WiFi router). It features a 128x64 OLED display, 8 control buttons, and a receiver scanning system to automatically discover and connect to robots.
+Katyusha Controller is a universal ESP32 firmware that turns your ESP32 board into a wireless robot remote control using the **ESP-NOW** protocol (peer-to-peer connection without a WiFi router). It features a 128x64 OLED display, 8 control buttons, Home Screen, Settings, Pairing Device, Turbo Speed, and Battery Indicator for both remote and robot.
 
 ---
 
@@ -28,31 +28,26 @@ Katyusha Controller is an ESP32 firmware that turns your ESP32 board into a wire
 
 ## Features ✨
 
-### Transmitter (Controller) 🎮
+### ✅ Existing Features
 
-| Feature | Description |
-|---------|-------------|
-| **8 Control Buttons** | D-pad (UP/DOWN/LEFT/RIGHT) + Y, X, A, B — software-debounced. |
-| **OLED 128x64 Display** | Shows movement mode, connection status, and active receiver name. |
-| **Home Screen** | Displays robot mode (FORWARD, BACKWARD, TURN, SPIN, etc.), LINK status (ONLINE/SEARCH), receiver name. |
-| **Menu System** | Navigate Scanning/Exit menu using UP/DOWN and X. |
-| **ESP-NOW Scanner** | Discovers nearby ESP-NOW receivers within 6 seconds, lists them, and lets you select one to control. |
-| **Marquee Text** | Long receiver names automatically scroll across the display. |
-| **10 Movement Modes** | FORWARD, BACKWARD, TURN_LEFT, TURN_RIGHT, FORWARD_LEFT, FORWARD_RIGHT, BACKWARD_LEFT, BACKWARD_RIGHT, SPIN_LEFT, SPIN_RIGHT, STOP. |
+| Feature                 | Description                                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **8 Control Buttons**   | D-pad (UP/DOWN/LEFT/RIGHT) + Y, X, A, B — software-debounced.                                                                      |
+| **OLED 128x64 Display** | Shows movement mode, connection status, and active receiver name.                                                                  |
+| **Home Screen**         | Displays movement mode, LINK status (ONLINE/SEARCH), receiver name, Turbo status, and Battery indicator.                           |
+| **Settings**            | Navigate settings menu by pressing **UP + Y** simultaneously.                                                                      |
+| **Pairing Device**      | ESP-NOW scanner that discovers nearby receivers within 6 seconds and lets you select one to pair.                                  |
+| **Turbo Speed**         | Toggle turbo mode for increased robot speed.                                                                                       |
+| **Battery Indicator**   | Battery level display for both remote and robot.                                                                                   |
+| **Marquee Text**        | Long receiver names automatically scroll across the display.                                                                       |
+| **10 Movement Modes**   | FORWARD, BACKWARD, TURN_LEFT, TURN_RIGHT, FORWARD_LEFT, FORWARD_RIGHT, BACKWARD_LEFT, BACKWARD_RIGHT, SPIN_LEFT, SPIN_RIGHT, STOP. |
 
-### Receiver (Sumo Robot) 🤖
+### 🔄 In Progress
 
-| Feature | Description |
-|---------|-------------|
-| **TB6612FNG Motor Driver** | Controls 2 DC motors with PWM (8-bit, 1 kHz). |
-| **ESP-NOW Discovery** | Responds to discovery requests from the transmitter with the device name. |
-| **Safety Timeout** | Motors automatically stop if no command is received for 300 ms. |
-
-### Utility — MAC Address Reader 🔧
-
-| Feature | Description |
-|---------|-------------|
-| **esp32-getmacaddress** | Reads MAC addresses from various interfaces (WiFi STA, Soft-AP, Bluetooth, Ethernet, IEEE802154). Useful for obtaining the receiver MAC before pairing. |
+| Feature          | Description                                        |
+| ---------------- | -------------------------------------------------- |
+| **Set Button**   | Custom button mapping configuration.               |
+| **Set Movement** | Configure robot movement behavior and preferences. |
 
 ---
 
@@ -64,7 +59,7 @@ katyusha-controller/
 │   ├── src/main.cpp              # Main transmitter code
 │   ├── platformio.ini            # PlatformIO configuration
 │   └── ...
-├── esp-receiver-sumo/            # Receiver firmware (sumo robot)
+├── esp-receiver/                 # Receiver firmware (robot)
 │   ├── src/main.cpp              # Main receiver code
 │   ├── platformio.ini            # PlatformIO configuration
 │   └── ...
@@ -80,44 +75,44 @@ katyusha-controller/
 
 ### Transmitter (Controller) 🎮
 
-| Component | Specification |
-|-----------|---------------|
-| Microcontroller | ESP32 (DOIT ESP32 DEVKIT V1 or compatible) |
-| Display | OLED 128x64, I2C (address 0x3C) — SSD1306 |
-| Buttons | 8x Tactile switches, internal pull-up (LOW = pressed) |
-| I2C Connection | SDA = GPIO21, SCL = GPIO22 |
+| Component       | Specification                                         |
+| --------------- | ----------------------------------------------------- |
+| Microcontroller | ESP32 (DOIT ESP32 DEVKIT V1 or compatible)            |
+| Display         | OLED 128x64, I2C (address 0x3C) — SSD1306             |
+| Buttons         | 8x Tactile switches, internal pull-up (LOW = pressed) |
+| I2C Connection  | SDA = GPIO21, SCL = GPIO22                            |
 
 **Button Mapping:**
 
-| Button | GPIO | Function |
-|--------|------|----------|
-| UP | 32 | Forward |
-| DOWN | 23 | Backward |
-| LEFT | 19 | Turn Left |
-| RIGHT | 18 | Turn Right |
-| Y 🟡 | 27 | Menu |
-| X 🔵 | 26 | Scanning / Select |
-| A 🟢 | 25 | (Future) |
-| B 🔴 | 33 | Back / Cancel |
+| Button | GPIO | Function          |
+| ------ | ---- | ----------------- |
+| UP     | 32   | Forward           |
+| DOWN   | 23   | Backward          |
+| LEFT   | 19   | Turn Left         |
+| RIGHT  | 18   | Turn Right        |
+| Y 🟡   | 27   | Menu              |
+| X 🔵   | 26   | Scanning / Select |
+| A 🟢   | 25   | (Future)          |
+| B 🔴   | 33   | Back / Cancel     |
 
-### Receiver (Sumo Robot) 🤖
+### Receiver (Robot) 🤖
 
-| Component | Specification |
-|-----------|---------------|
+| Component       | Specification                              |
+| --------------- | ------------------------------------------ |
 | Microcontroller | ESP32 (DOIT ESP32 DEVKIT V1 or compatible) |
-| Motor Driver | TB6612FNG |
-| Motors | 2x DC Motor |
+| Motor Driver    | TB6612FNG                                  |
+| Motors          | 2x DC Motor                                |
 
 **Motor Driver Pin Mapping:**
 
-| Function | ESP32 Pin |
-|----------|-----------|
-| PWMA (Motor A) | 13 |
-| AIN1 | 26 |
-| AIN2 | 27 |
-| PWMB (Motor B) | 32 |
-| BIN1 | 25 |
-| BIN2 | 33 |
+| Function       | ESP32 Pin |
+| -------------- | --------- |
+| PWMA (Motor A) | 13        |
+| AIN1           | 26        |
+| AIN2           | 27        |
+| PWMB (Motor B) | 32        |
+| BIN1           | 25        |
+| BIN2           | 33        |
 
 ---
 
@@ -169,7 +164,7 @@ uint8_t receiverMAC[] = {0x78, 0x1C, 0x3C, 0x2B, 0xDF, 0xB4};
 Upload the receiver firmware:
 
 ```bash
-cd esp-receiver-sumo
+cd esp-receiver
 pio run --target upload
 ```
 
@@ -189,7 +184,7 @@ pio run --target upload
 ### Transmitter — Controller 🎮
 
 1. Power on the transmitter — the **Home Screen** will appear.
-2. Press **Y** 🟡 to open the **Menu**.
+2. Press **UP + Y** simultaneously to open **Settings**.
 3. Select **Scanning** using UP/DOWN, then press **X** 🔵 to start scanning.
 4. The transmitter will search for receivers for 6 seconds and display the list.
 5. Select a receiver with UP/DOWN, then press **X** 🔵 to connect.
@@ -202,10 +197,9 @@ pio run --target upload
     - **UP + RIGHT** → Forward-right diagonal
     - **DOWN + LEFT** → Backward-left diagonal
     - **DOWN + RIGHT** → Backward-right diagonal
-    - **Y** 🟡 → Menu
-    - **B** 🔴 → Back
-    - **X** 🔵 → Scanning / Select
-7. The display shows the movement mode and connection status in _real-time_.
+    - **B** 🔴 → Back / Cancel
+    - **X** 🔵 → Select
+7. The display shows the movement mode, connection status, Turbo status, and battery indicator in _real-time_.
 
 ### Receiver — Robot 🤖
 
@@ -220,11 +214,11 @@ pio run --target upload
 
 ### Packet Types
 
-| Type | Value | Description |
-|------|-------|-------------|
-| `PACKET_TYPE_CONTROL` | 1 | Robot control command |
-| `PACKET_TYPE_DISCOVERY_REQUEST` | 2 | Discovery request from transmitter |
-| `PACKET_TYPE_DISCOVERY_RESPONSE` | 3 | Discovery response from receiver |
+| Type                             | Value | Description                        |
+| -------------------------------- | ----- | ---------------------------------- |
+| `PACKET_TYPE_CONTROL`            | 1     | Robot control command              |
+| `PACKET_TYPE_DISCOVERY_REQUEST`  | 2     | Discovery request from transmitter |
+| `PACKET_TYPE_DISCOVERY_RESPONSE` | 3     | Discovery response from receiver   |
 
 ### Control Packet (6 bytes)
 
@@ -245,25 +239,6 @@ typedef struct {
   char     name[16];     // Device name (null-terminated)
 } DiscoveryPacket;
 ```
-
----
-
-## Future Development 🚧
-
-Upcoming development plans:
-
-- [ ] **Custom Button Mapping** — Users can reassign button functions.
-- [ ] **Robot Ability System** — Configure robot-specific capabilities (max speed, acceleration, tank-drive / mecanum mode).
-- [ ] **PID / Stabilization** — Control algorithms to maintain stable movement at high speeds.
-- [ ] **Multiple Robot Support** — Switch between multiple robots without re-scanning.
-- [ ] **Telemetry Feedback** — Receive telemetry data from the robot (battery, sensors, temperature).
-- [ ] **Profile System** — Save configurations for different robots.
-- [ ] **Receiver Firmware for Other Robots** — Beyond sumo robots (mecanum, rover, battlebot, etc.).
-- [ ] **Robot Soccer Compatibility** — Receiver firmware for soccer robots with precise and responsive control.
-
-We are open to ideas and contributions from anyone!
-
----
 
 ## Contributing 🤝
 
