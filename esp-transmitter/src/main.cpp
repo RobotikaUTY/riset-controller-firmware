@@ -11,6 +11,16 @@
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+// ===================== BATTERY SENSE (CONTROLLER) =====================
+// Pin ADC untuk baca baterai remote lewat voltage divider (belum dipakai fungsi lain)
+#define BATTERY_ADC_PIN 34
+
+// Rasio divider = (R1+R2)/R2. Contoh: R1=1k (ke B+), R2=3k (ke GND) -> (1000+3000)/3000 = 1.33
+// WAJIB dikalibrasi ulang pakai multimeter sesuai resistor asli yang dipasang.
+const float remoteDividerRatio = 1.33f;
+const float adcRefVoltage = 3.3f;
+const float adcResolution = 4095.0f;
+
 // ===================== BUTTON PINS =====================
 // 8-button keypad layout: D-pad + Y/X/A/B
 #define BTN_UP 32
@@ -65,7 +75,8 @@ enum UiScreen : uint8_t {
 enum PacketType : uint8_t {
   PACKET_TYPE_CONTROL = 1,
   PACKET_TYPE_DISCOVERY_REQUEST = 2,
-  PACKET_TYPE_DISCOVERY_RESPONSE = 3
+  PACKET_TYPE_DISCOVERY_RESPONSE = 3,
+  PACKET_TYPE_TELEMETRY = 4
 };
 
 typedef struct {
@@ -86,6 +97,13 @@ typedef struct {
   uint8_t mac[6];
   char name[16];
 } ReceiverEntry;
+
+// Dikirim BALIK oleh receiver (robot) ke controller, isinya tegangan baterai robot saat ini.
+// Struct ini harus identik (urutan & tipe field) dengan yang ada di kode receiver.
+typedef struct {
+  uint8_t type;
+  float batteryVoltage;
+} TelemetryPacket;
 
 // ===================== STATUS =====================
 bool connected = false;
@@ -161,6 +179,17 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 void onDataReceived(const uint8_t *mac, const uint8_t *incomingData, int len) {
   (void)mac;
 
+  // Telemetry dari robot (baterai) - dicek lebih dulu karena ukurannya paling kecil & khas
+  if (len == (int)sizeof(TelemetryPacket)) {
+    TelemetryPacket telemetry = {};
+    memcpy(&telemetry, incomingData, sizeof(telemetry));
+
+    if (telemetry.type == PACKET_TYPE_TELEMETRY) {
+      robotBatteryVoltage = telemetry.batteryVoltage;
+    }
+    return;
+  }
+
   if (len < (int)sizeof(DiscoveryPacket)) {
     return;
   }
@@ -188,6 +217,13 @@ void onDataReceived(const uint8_t *mac, const uint8_t *incomingData, int len) {
   strncpy(discoveredReceivers[discoveredReceiverCount].name, discoveryPacket.name, sizeof(discoveredReceivers[discoveredReceiverCount].name) - 1);
   discoveredReceivers[discoveredReceiverCount].name[sizeof(discoveredReceivers[discoveredReceiverCount].name) - 1] = '\0';
   discoveredReceiverCount++;
+}
+
+// Baca tegangan baterai remote lewat ADC + voltage divider
+float readRemoteBatteryVoltage() {
+  int raw = analogRead(BATTERY_ADC_PIN);
+  float vAdc = (raw / adcResolution) * adcRefVoltage;
+  return vAdc * remoteDividerRatio;
 }
 
 void formatMac(const uint8_t *mac, char *buffer, size_t bufferSize) {
@@ -846,6 +882,7 @@ void setup() {
   pinMode(BTN_X, INPUT_PULLUP);
   pinMode(BTN_A, INPUT_PULLUP);
   pinMode(BTN_B, INPUT_PULLUP);
+  pinMode(BATTERY_ADC_PIN, INPUT);
   initializeDebouncedButtons();
 
   // OLED
@@ -892,6 +929,10 @@ void setup() {
 
 void loop() {
   uint8_t buttons = readDebouncedButtons();
+
+  // Update baterai remote (dinamis, dengan smoothing biar tidak jitter)
+  float rawRemoteV = readRemoteBatteryVoltage();
+  remoteBatteryVoltage = (remoteBatteryVoltage * 0.9f) + (rawRemoteV * 0.1f);
 
   handleUi(buttons);
 
