@@ -1,293 +1,294 @@
-# Katyusha Controller 🚀
+# ESP NOW Controller 🚀
 
-> **ESP-NOW based robot remote control** — developed by **Technology Development Division**, Robotika UTY.
+> **Kendali robot berbasis ESP-NOW** — dikembangkan oleh **Divisi Pengembangan Teknologi**, Robotika UTY.
 
-Katyusha Controller is a universal ESP32 firmware that turns your ESP32 board into a wireless robot remote control using the **ESP-NOW** protocol (peer-to-peer connection without a WiFi router). It features a 128x64 OLED display, 8 control buttons, Home Screen, Settings, Pairing Device, Turbo Speed, and Battery Indicator for both remote and robot.
+ESP NOW Controller adalah firmware ESP32 universal yang mengubah papan ESP32 Anda menjadi kendali jarak jauh robot nirkabel menggunakan protokol **ESP-NOW** (koneksi peer-to-peer tanpa router WiFi). Dilengkapi dengan layar OLED 128x64, 8 tombol kontrol, Layar Utama, Pengaturan, Pemasangan Perangkat, Kecepatan Turbo, dan Indikator Baterai untuk kendali maupun robot.
 
 ---
 
-## Table of Contents 📑
+## Daftar Isi 📑
 
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Hardware Requirements](#hardware-requirements)
-- [Installation](#installation)
-    - [1. Prerequisites](#1-prerequisites)
-    - [2. Upload Transmitter Firmware (Controller)](#2-upload-transmitter-firmware-controller)
-    - [3. Upload Receiver Firmware (Robot)](#3-upload-receiver-firmware-robot)
-- [Usage](#usage)
-    - [Transmitter — Controller](#transmitter--controller)
+- [Fitur](#fitur)
+- [Struktur Proyek](#struktur-proyek)
+- [Kebutuhan Perangkat Keras](#kebutuhan-perangkat-keras)
+- [Instalasi](#instalasi)
+    - [1. Prasyarat](#1-prasyarat)
+    - [2. Upload Firmware Transmitter (Kendali)](#2-upload-firmware-transmitter-kendali)
+    - [3. Upload Firmware Receiver (Robot)](#3-upload-firmware-receiver-robot)
+- [Penggunaan](#penggunaan)
+    - [Transmitter — Kendali](#transmitter--kendali)
     - [Receiver — Robot](#receiver--robot)
-- [ESP-NOW Protocol](#esp-now-protocol)
-- [Future Development](#future-development)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+- [Protokol ESP-NOW](#protokol-esp-now)
+- [Kontribusi](#kontribusi)
+- [Lisensi](#lisensi)
+- [Kontak](#kontak)
 
 ---
 
-## Features ✨
+## Fitur ✨
 
-### ✅ Existing Features
+### ✅ Fitur Tersedia
 
-| Feature                 | Description                                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **8 Control Buttons**   | D-pad (UP/DOWN/LEFT/RIGHT) + Y, X, A, B — software-debounced.                                                                      |
-| **OLED 128x64 Display** | Shows movement mode, connection status, and active receiver name.                                                                  |
-| **Home Screen**         | Displays movement mode, LINK status (ONLINE/SEARCH), receiver name, Turbo status, and Battery indicator.                           |
-| **Settings**            | Navigate settings menu by pressing **UP + Y** simultaneously.                                                                      |
-| **Pairing Device**      | ESP-NOW scanner that discovers nearby receivers within 6 seconds and lets you select one to pair.                                  |
-| **Turbo Speed**         | Toggle turbo mode for increased robot speed.                                                                                       |
-| **Battery Indicator**   | Battery level display for both remote and robot.                                                                                   |
-| **Marquee Text**        | Long receiver names automatically scroll across the display.                                                                       |
-| **10 Movement Modes**   | FORWARD, BACKWARD, TURN_LEFT, TURN_RIGHT, FORWARD_LEFT, FORWARD_RIGHT, BACKWARD_LEFT, BACKWARD_RIGHT, SPIN_LEFT, SPIN_RIGHT, STOP. |
+| Fitur                    | Deskripsi                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **8 Tombol Kontrol**     | D-pad (ATAS/BAWAH/KIRI/KANAN) + Y, X, A, B — debounce perangkat lunak.                                                        |
+| **Layar OLED 128x64**    | Menampilkan mode gerakan, status koneksi, dan nama receiver yang aktif.                                                        |
+| **Layar Utama**          | Menampilkan mode gerakan, status LINK (ONLINE/SEARCH), nama receiver, status Turbo, dan indikator Baterai.                    |
+| **Pengaturan**           | Navigasi menu pengaturan dengan menekan **ATAS + Y** secara bersamaan.                                                         |
+| **Pemasangan Perangkat** | Pemindai ESP-NOW yang menemukan receiver terdekat dalam 6 detik dan memungkinkan Anda memilih salah satu untuk dipasangkan.    |
+| **Turbo Speed**          | Aktifkan/nonaktifkan mode turbo untuk meningkatkan kecepatan robot.                                                            |
+| **Indikator Baterai**    | Menampilkan level baterai untuk kendali dan robot.                                                                            |
+| **Teks Berjalan**        | Nama receiver yang panjang secara otomatis bergulir di layar.                                                                 |
+| **10 Mode Gerakan**      | MAJU, MUNDUR, BELOK_KIRI, BELOK_KANAN, MAJU_KIRI, MAJU_KANAN, MUNDUR_KIRI, MUNDUR_KANAN, PUTAR_KIRI, PUTAR_KANAN, BERHENTI. |
 
-### 🔄 In Progress
+### 🔄 Dalam Pengembangan
 
-| Feature          | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| **Set Button**   | Custom button mapping configuration.               |
-| **Set Movement** | Configure robot movement behavior and preferences. |
+| Fitur             | Deskripsi                                             |
+| ----------------- | ----------------------------------------------------- |
+| **Set Button**    | Konfigurasi pemetaan tombol khusus.                   |
+| **Set Movement**  | Konfigurasi perilaku dan preferensi gerakan robot.    |
 
 ---
 
-## Project Structure 📂
+## Struktur Proyek 📂
 
 ```
-katyusha-controller/
-├── esp-transmitter/              # Transmitter firmware (controller)
-│   ├── src/main.cpp              # Main transmitter code
-│   ├── platformio.ini            # PlatformIO configuration
+esp-now-controller/
+├── esp-transmitter/              # Firmware transmitter (kendali)
+│   ├── src/main.cpp              # Kode utama transmitter
+│   ├── platformio.ini            # Konfigurasi PlatformIO
 │   └── ...
-├── esp-receiver/                 # Receiver firmware (robot)
-│   ├── src/main.cpp              # Main receiver code
-│   ├── platformio.ini            # PlatformIO configuration
+├── esp-receiver/                 # Firmware receiver (robot)
+│   ├── src/main.cpp              # Kode utama receiver
+│   ├── platformio.ini            # Konfigurasi PlatformIO
 │   └── ...
-├── esp32-getmacaddress/          # MAC address utility
+├── esp32-getmacaddress/          # Utilitas alamat MAC
 │   ├── src/main.cpp
 │   └── platformio.ini
-└── README.md                     # Project documentation
+└── README.md                     # Dokumentasi proyek
 ```
 
 ---
 
-## Hardware Requirements 🔧
+## Kebutuhan Perangkat Keras 🔧
 
-### Transmitter (Controller) 🎮
+### Transmitter (Kendali) 🎮
 
-| Component       | Specification                                         |
-| --------------- | ----------------------------------------------------- |
-| Microcontroller | ESP32 (DOIT ESP32 DEVKIT V1 or compatible)            |
-| Display         | OLED 128x64, I2C (address 0x3C) — SSD1306             |
-| Buttons         | 8x Tactile switches, internal pull-up (LOW = pressed) |
-| I2C Connection  | SDA = GPIO21, SCL = GPIO22                            |
+| Komponen        | Spesifikasi                                          |
+| --------------- | ---------------------------------------------------- |
+| Mikrokontroler  | ESP32 (DOIT ESP32 DEVKIT V1 atau kompatibel)         |
+| Layar           | OLED 128x64, I2C (alamat 0x3C) — SSD1306             |
+| Tombol          | 8x Saklar tactile, internal pull-up (LOW = ditekan)  |
+| Koneksi I2C     | SDA = GPIO21, SCL = GPIO22                           |
 
-**Button Mapping:**
+**Pemetaan Tombol:**
 
-| Button | GPIO | Function          |
-| ------ | ---- | ----------------- |
-| UP     | 32   | Forward           |
-| DOWN   | 23   | Backward          |
-| LEFT   | 19   | Turn Left         |
-| RIGHT  | 18   | Turn Right        |
-| Y 🟡   | 27   | Menu              |
-| X 🔵   | 26   | Scanning / Select |
-| A 🟢   | 25   | (Future)          |
-| B 🔴   | 33   | Back / Cancel     |
+| Tombol  | GPIO | Fungsi            |
+| ------- | ---- | ----------------- |
+| ATAS    | 32   | Maju              |
+| BAWAH   | 23   | Mundur            |
+| KIRI    | 19   | Belok Kiri        |
+| KANAN   | 18   | Belok Kanan       |
+| Y 🟡    | 27   | Menu              |
+| X 🔵    | 26   | Pemindaian / Pilih|
+| A 🟢    | 25   | (Mendatang)       |
+| B 🔴    | 33   | Kembali / Batal   |
 
 ### Receiver (Robot) 🤖
 
-| Component       | Specification                              |
-| --------------- | ------------------------------------------ |
-| Microcontroller | ESP32 (DOIT ESP32 DEVKIT V1 or compatible) |
-| Motor Driver    | TB6612FNG                                  |
-| Motors          | 2x DC Motor                                |
+| Komponen        | Spesifikasi                               |
+| --------------- | ----------------------------------------- |
+| Mikrokontroler  | ESP32 (DOIT ESP32 DEVKIT V1 atau kompatibel) |
+| Driver Motor    | TB6612FNG                                 |
+| Motor           | 2x Motor DC                               |
 
-**Motor Driver Pin Mapping:**
+**Pemetaan Pin Driver Motor:**
 
-| Function       | ESP32 Pin |
-| -------------- | --------- |
-| PWMA (Motor A) | 13        |
-| AIN1           | 26        |
-| AIN2           | 27        |
-| PWMB (Motor B) | 32        |
-| BIN1           | 25        |
-| BIN2           | 33        |
+| Fungsi          | Pin ESP32 |
+| --------------- | --------- |
+| PWMA (Motor A)  | 13        |
+| AIN1            | 26        |
+| AIN2            | 27        |
+| PWMB (Motor B)  | 32        |
+| BIN1            | 25        |
+| BIN2            | 33        |
 
 ---
 
-## Installation 📥
+## Instalasi 📥
 
-### Prerequisites 📋
+### Prasyarat 📋
 
-- [PlatformIO](https://platformio.org/) (VS Code extension or CLI)
+- [PlatformIO](https://platformio.org/) (ekstensi VS Code atau CLI)
 - [Git](https://git-scm.com/)
 
-### 1. Clone Repository 📦
+### 1. Kloning Repository 📦
 
 ```bash
 git clone https://github.com/RobotikaUTY/riset-controller-firmware.git
 cd riset-controller-firmware
 ```
 
-### 2. Upload Transmitter Firmware (Controller) 📤
+### 2. Upload Firmware Transmitter (Kendali) 📤
 
 ```bash
 cd esp-transmitter
 pio run --target upload
 ```
 
-After uploading, open the serial monitor to verify:
+Setelah upload, buka serial monitor untuk verifikasi:
 
 ```bash
 pio device monitor
 ```
 
-### 3. Upload Receiver Firmware (Robot) 📥
+### 3. Upload Firmware Receiver (Robot) 📥
 
-First, obtain the MAC address of your ESP32 receiver:
+Pertama, dapatkan alamat MAC receiver ESP32 Anda:
 
 ```bash
 cd esp32-getmacaddress
 pio run --target upload
 pio device monitor
-# Note the WiFi Station MAC address (e.g., 78:1C:3C:2B:DF:B4)
+# Catat alamat MAC WiFi Station (contoh: 78:1C:3C:2B:DF:B4)
 ```
 
-Then copy that MAC address into `esp-transmitter/src/main.cpp`:
+Kemudian salin alamat MAC tersebut ke `esp-transmitter/src/main.cpp`:
 
 ```cpp
-// Replace with your receiver's MAC address
+// Ganti dengan alamat MAC receiver Anda
 uint8_t receiverMAC[] = {0x78, 0x1C, 0x3C, 0x2B, 0xDF, 0xB4};
 ```
 
-Upload the receiver firmware:
+Upload firmware receiver:
 
 ```bash
 cd esp-receiver
 pio run --target upload
 ```
 
-Re-upload the transmitter with the updated MAC:
+Upload ulang transmitter dengan MAC yang telah diperbarui:
 
 ```bash
 cd esp-transmitter
 pio run --target upload
 ```
 
-> **Note:** If you use the _scanning_ feature, you don't need to set the MAC manually — the transmitter will automatically discover receivers via ESP-NOW discovery.
+> **Catatan:** Jika Anda menggunakan fitur _pemindaian_, Anda tidak perlu mengatur MAC secara manual — transmitter akan secara otomatis menemukan receiver melalui penemuan ESP-NOW.
 
 ---
 
-## Usage 🎯
+## Penggunaan 🎯
 
-### Transmitter — Controller 🎮
+### Transmitter — Kendali 🎮
 
-1. Power on the transmitter — the **Home Screen** will appear.
-2. Press **UP + Y** simultaneously to open **Settings**.
-3. Select **Scanning** using UP/DOWN, then press **X** 🔵 to start scanning.
-4. The transmitter will search for receivers for 6 seconds and display the list.
-5. Select a receiver with UP/DOWN, then press **X** 🔵 to connect.
-6. Once connected, use the **D-pad** to control the robot:
-    - **UP** → Forward
-    - **DOWN** → Backward
-    - **LEFT** → Turn left
-    - **RIGHT** → Turn right
-    - **UP + LEFT** → Forward-left diagonal
-    - **UP + RIGHT** → Forward-right diagonal
-    - **DOWN + LEFT** → Backward-left diagonal
-    - **DOWN + RIGHT** → Backward-right diagonal
-    - **B** 🔴 → Back / Cancel
-    - **X** 🔵 → Select
-7. The display shows the movement mode, connection status, Turbo status, and battery indicator in _real-time_.
+1. Nyalakan transmitter — **Layar Utama** akan muncul.
+2. Tekan **ATAS + Y** secara bersamaan untuk membuka **Pengaturan**.
+3. Pilih **Pemindaian** menggunakan ATAS/BAWAH, lalu tekan **X** 🔵 untuk memulai pemindaian.
+4. Transmitter akan mencari receiver selama 6 detik dan menampilkan daftarnya.
+5. Pilih receiver dengan ATAS/BAWAH, lalu tekan **X** 🔵 untuk terhubung.
+6. Setelah terhubung, gunakan **D-pad** untuk mengendalikan robot:
+    - **ATAS** → Maju
+    - **BAWAH** → Mundur
+    - **KIRI** → Belok kiri
+    - **KANAN** → Belok kanan
+    - **ATAS + KIRI** → Diagonal maju-kiri
+    - **ATAS + KANAN** → Diagonal maju-kanan
+    - **BAWAH + KIRI** → Diagonal mundur-kiri
+    - **BAWAH + KANAN** → Diagonal mundur-kanan
+    - **B** 🔴 → Kembali / Batal
+    - **X** 🔵 → Pilih
+7. Layar menampilkan mode gerakan, status koneksi, status Turbo, dan indikator baterai secara _real-time_.
 
 ### Receiver — Robot 🤖
 
-1. Power on the receiver — it will immediately be ready to receive commands.
-2. When a _discovery request_ is received from the transmitter, the receiver replies with its device name.
-3. The robot moves according to the commands received from the transmitter.
-4. If no command is received for 300 ms, the robot automatically stops (_safety timeout_).
+1. Nyalakan receiver — receiver akan langsung siap menerima perintah.
+2. Saat permintaan _penemuan_ diterima dari transmitter, receiver membalas dengan nama perangkatnya.
+3. Robot bergerak sesuai perintah yang diterima dari transmitter.
+4. Jika tidak ada perintah yang diterima selama 300 ms, robot secara otomatis berhenti (_timeout pengamanan_).
 
 ---
 
-## ESP-NOW Protocol 📡
+## Protokol ESP-NOW 📡
 
-### Packet Types
+### Tipe Paket
 
-| Type                             | Value | Description                        |
-| -------------------------------- | ----- | ---------------------------------- |
-| `PACKET_TYPE_CONTROL`            | 1     | Robot control command              |
-| `PACKET_TYPE_DISCOVERY_REQUEST`  | 2     | Discovery request from transmitter |
-| `PACKET_TYPE_DISCOVERY_RESPONSE` | 3     | Discovery response from receiver   |
+| Tipe                             | Nilai | Deskripsi                         |
+| -------------------------------- | ----- | --------------------------------- |
+| `PACKET_TYPE_CONTROL`            | 1     | Perintah kendali robot            |
+| `PACKET_TYPE_DISCOVERY_REQUEST`  | 2     | Permintaan penemuan dari transmitter |
+| `PACKET_TYPE_DISCOVERY_RESPONSE` | 3     | Respon penemuan dari receiver     |
 
-### Control Packet (6 bytes)
+### Paket Kontrol (6 byte)
 
 ```c
 typedef struct {
-  uint8_t buttons;   // Bitmask of pressed buttons
-  uint8_t speed;     // Motor speed (0-255)
-  uint8_t mode;      // Movement mode (FORWARD, BACKWARD, etc.)
+  uint8_t buttons;   // Bitmask tombol yang ditekan
+  uint8_t speed;     // Kecepatan motor (0-255)
+  uint8_t mode;      // Mode gerakan (MAJU, MUNDUR, dll.)
 } ControlPacket;
 ```
 
-### Discovery Packet (23 bytes)
+### Paket Penemuan (23 byte)
 
 ```c
 typedef struct {
-  uint8_t type;          // Packet type (REQUEST / RESPONSE)
-  uint8_t senderMac[6];  // Sender MAC address
-  char     name[16];     // Device name (null-terminated)
+  uint8_t type;          // Tipe paket (REQUEST / RESPONSE)
+  uint8_t senderMac[6];  // Alamat MAC pengirim
+  char     name[16];     // Nama perangkat (diakhiri null)
 } DiscoveryPacket;
 ```
 
-## Contributing 🤝
+---
 
-We welcome contributions from everyone — whether it's a bug fix, a new feature, or documentation improvements.
+## Kontribusi 🤝
 
-### Contribution Guide 📋
+Kami menyambut kontribusi dari siapa pun — baik itu perbaikan bug, fitur baru, atau peningkatan dokumentasi.
 
-1. **Fork** this repository to your GitHub account.
-2. **Clone** your fork locally:
+### Panduan Kontribusi 📋
+
+1. **Fork** repository ini ke akun GitHub Anda.
+2. **Clone** fork Anda secara lokal:
     ```bash
     git clone https://github.com/username/riset-controller-firmware.git
     ```
-3. Create a new **branch** for your feature/fix:
+3. Buat **branch** baru untuk fitur/perbaikan Anda:
     ```bash
-    git checkout -b feat/awesome-feature
+    git checkout -b feat/fitur-keren
     ```
-4. Make your changes, then **commit**:
+4. Lakukan perubahan, lalu **commit**:
     ```bash
     git add .
-    git commit -m "feat: add awesome feature"
+    git commit -m "feat: tambah fitur keren"
     ```
-5. **Push** to your fork:
+5. **Push** ke fork Anda:
     ```bash
-    git push origin feat/awesome-feature
+    git push origin feat/fitur-keren
     ```
-6. Open a **Pull Request** to the main repository — describe your changes in detail.
+6. Buka **Pull Request** ke repository utama — jelaskan perubahan Anda secara detail.
 
-### Contribution Guidelines
+### Pedoman Kontribusi
 
-- Follow the existing _coding style_ (C++ with PlatformIO).
-- Use _conventional commits_: `feat:`, `fix:`, `docs:`, `refactor:`, etc.
-- Provide a clear description in your PR.
-- If adding a new feature, include appropriate documentation.
-- Ensure the code compiles without _warnings_.
+- Ikuti _gaya penulisan kode_ yang ada (C++ dengan PlatformIO).
+- Gunakan _conventional commits_: `feat:`, `fix:`, `docs:`, `refactor:`, dll.
+- Berikan deskripsi yang jelas di PR Anda.
+- Jika menambahkan fitur baru, sertakan dokumentasi yang sesuai.
+- Pastikan kode dapat dikompilasi tanpa _peringatan_.
 
-### Bug Reports / Feature Requests
+### Laporan Bug / Permintaan Fitur
 
-Open a [GitHub Issue](https://github.com/RobotikaUTY/riset-controller-firmware/issues) and use the available template.
+Buka [GitHub Issue](https://github.com/RobotikaUTY/riset-controller-firmware/issues) dan gunakan template yang tersedia.
 
 ---
 
-## License ⚖️
+## Lisensi ⚖️
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+Proyek ini dilisensikan di bawah **Lisensi MIT** — lihat file [LICENSE](LICENSE) untuk detailnya.
 
 ```
 MIT License
 
-Copyright (c) 2026 Technology Development Division, Robotika UTY
+Copyright (c) 2026 Divisi Pengembangan Teknologi, Robotika UTY
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -310,9 +311,9 @@ SOFTWARE.
 
 ---
 
-## Contact 📬
+## Kontak 📬
 
-**Technology Development Division**  
+**Divisi Pengembangan Teknologi**  
 Robotika Universitas Teknologi Yogyakarta (UTY)
 
 - GitHub: [github.com/RobotikaUTY](https://github.com/RobotikaUTY)
