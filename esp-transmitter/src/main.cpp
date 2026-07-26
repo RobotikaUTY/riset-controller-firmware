@@ -6,6 +6,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/TomThumb.h>
+#include "boot_animation.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -871,6 +872,18 @@ void handleUi(uint8_t buttons) {
   }
 }
 
+// Memutar animasi boot dari boot_animation.h sekali, lalu lanjut ke inisialisasi lainnya
+void playBootAnimation() {
+  const uint16_t frameDelayMs = 200; // sesuaikan biar durasi total pas
+
+  for (uint8_t i = 0; i < bootFrameCount; i++) {
+    display.clearDisplay();
+    display.drawBitmap(0, 0, bootFrames[i], SCREEN_WIDTH, SCREEN_HEIGHT, SSD1306_WHITE);
+    display.display();
+    delay(frameDelayMs);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -891,10 +904,7 @@ void setup() {
   display.clearDisplay();
   display.display();
 
-  display.println("BOOTING...");
-  display.println("ESP TRANSMITTER");
-  display.display();
-  delay(700);
+  playBootAnimation();
 
   // WiFi
   WiFi.mode(WIFI_STA);
