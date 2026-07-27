@@ -14,11 +14,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // ===================== BATTERY SENSE (CONTROLLER) =====================
 // Pin ADC untuk baca baterai remote lewat voltage divider (belum dipakai fungsi lain)
-#define BATTERY_ADC_PIN 34
+#define BATTERY_ADC_PIN 35
 
 // Rasio divider = (R1+R2)/R2. Contoh: R1=1k (ke B+), R2=3k (ke GND) -> (1000+3000)/3000 = 1.33
 // WAJIB dikalibrasi ulang pakai multimeter sesuai resistor asli yang dipasang.
-const float remoteDividerRatio = 1.33f;
+const float remoteDividerRatio = 2.216f;
 const float adcRefVoltage = 3.3f;
 const float adcResolution = 4095.0f;
 
@@ -874,7 +874,7 @@ void handleUi(uint8_t buttons) {
 
 // Memutar animasi boot dari boot_animation.h sekali, lalu lanjut ke inisialisasi lainnya
 void playBootAnimation() {
-  const uint16_t frameDelayMs = 200; // sesuaikan biar durasi total pas
+  const uint16_t frameDelayMs = 100; // sesuaikan biar durasi total pas
 
   for (uint8_t i = 0; i < bootFrameCount; i++) {
     display.clearDisplay();
