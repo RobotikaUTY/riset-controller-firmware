@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
-
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -10,11 +9,14 @@
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
+
+#define OLED_SDA 5
+#define OLED_SCL 6
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // ===================== BATTERY SENSE (CONTROLLER) =====================
 // Pin ADC untuk baca baterai remote lewat voltage divider (belum dipakai fungsi lain)
-#define BATTERY_ADC_PIN 35
+#define BATTERY_ADC_PIN 4
 
 // Rasio divider = (R1+R2)/R2. Contoh: R1=1k (ke B+), R2=3k (ke GND) -> (1000+3000)/3000 = 1.33
 // WAJIB dikalibrasi ulang pakai multimeter sesuai resistor asli yang dipasang.
@@ -24,14 +26,14 @@ const float adcResolution = 4095.0f;
 
 // ===================== BUTTON PINS =====================
 // 8-button keypad layout: D-pad + Y/X/A/B
-#define BTN_UP 32
-#define BTN_DOWN 23
-#define BTN_LEFT 19
-#define BTN_RIGHT 18
-#define BTN_Y 27
-#define BTN_X 26
-#define BTN_A 25
-#define BTN_B 33
+#define BTN_UP 20
+#define BTN_DOWN 10
+#define BTN_LEFT 7
+#define BTN_RIGHT 21
+#define BTN_Y 0
+#define BTN_X 1
+#define BTN_A 3
+#define BTN_B 2
 
 // ===================== RECEIVER MAC =====================
 uint8_t receiverMAC[] = {0x78, 0x1C, 0x3C, 0x2B, 0xDF, 0xB4};
@@ -886,6 +888,7 @@ void playBootAnimation() {
 
 void setup() {
   Serial.begin(115200);
+  delay(1000);
 
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
@@ -899,7 +902,7 @@ void setup() {
   initializeDebouncedButtons();
 
   // OLED
-  Wire.begin(21, 22);
+  Wire.begin(OLED_SDA, OLED_SCL);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
   display.display();
