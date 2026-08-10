@@ -26,7 +26,7 @@
 // R1=10k (ke B+), R2=3.3k (ke GND) -> (10000+3300)/3300 = 4.03
 // WAJIB dikalibrasi ulang pakai multimeter sesuai resistor asli yang dipasang,
 // dan sesuaikan kalau jenis/jumlah sel baterainya berbeda.
-const float robotDividerRatio = 4.03f;
+const float robotDividerRatio = 6.13f;
 const float adcRefVoltage = 3.3f;
 const float adcResolution = 4095.0f;
 
