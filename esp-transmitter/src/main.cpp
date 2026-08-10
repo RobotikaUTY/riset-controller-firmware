@@ -912,6 +912,8 @@ void setup() {
   // WiFi
   WiFi.mode(WIFI_STA);
 
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+
   // ESP-NOW
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP NOW INIT FAILED");
